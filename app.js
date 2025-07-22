@@ -2,16 +2,16 @@ const express = require('express');
 const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
+const http = require('http'); // <-- Explicit HTTP
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = 3000;
 
 const uploadDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir);
 }
 
-// Middleware to parse form data
 app.use(express.urlencoded({ extended: true }));
 
 const storage = multer.diskStorage({
@@ -20,20 +20,16 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-// Serve static files for downloads
 app.use('/uploads', express.static(uploadDir));
 
-// Main page
 app.get('/', (req, res) => {
     fs.readdir(uploadDir, (err, files) => {
         if (err) files = [];
-        // Gather file stats for sorting
         const fileData = files.map(filename => {
             const filepath = path.join(uploadDir, filename);
             const stat = fs.statSync(filepath);
             return { filename, mtime: stat.mtime };
         });
-        // Sort by modified time, latest first
         fileData.sort((a, b) => b.mtime - a.mtime);
 
         res.send(`
@@ -87,25 +83,21 @@ app.get('/', (req, res) => {
     });
 });
 
-// Upload endpoint
 app.post('/upload', upload.single('file'), (req, res) => {
     res.redirect('/');
 });
 
-// Delete endpoint
 app.post('/delete', (req, res) => {
     let filename = req.body.filename;
     if (!filename) return res.redirect('/');
-    // Decode in case of spaces and special chars
     filename = decodeURIComponent(filename);
     const filePath = path.join(uploadDir, filename);
     fs.unlink(filePath, err => {
-        // Ignore errors if file missing
         res.redirect('/');
     });
 });
 
-// Listen
-app.listen(PORT, () => {
-    console.log(`Server started on http://localhost:${PORT}`);
+// Explicitly create and start an HTTP server
+http.createServer(app).listen(PORT, () => {
+    console.log(`HTTP server running at http://localhost:${PORT}`);
 });
